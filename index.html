@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>THERMAL-CORE v10.2 - Responsive</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;700&display=swap');
+        
+        :root {
+            --bg-root: #000000;
+            --accent-bio: #10b981; 
+            --accent-psi: #a855f7; 
+            --accent-deep: #3b82f6; 
+            --border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-root);
+            color: #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh; /* Full viewport height */
+            height: 100dvh; /* Dynamic viewport for mobile bars */
+            padding: 0.5rem;
+            margin: 0;
+            overflow: hidden; /* Prevent body scroll */
+        }
+        
+        .chassis {
+            background: radial-gradient(circle at top, #0f0f11, #000);
+            border-radius: 24px;
+            padding: 1.5rem;
+            width: 100%;
+            max-width: 600px;
+            /* THE FIX: Fit to screen, don't force 850px */
+            height: 100%; 
+            max-height: 95dvh; 
+            border: var(--border);
+            box-shadow: 0 20px 100px -20px rgba(255,255,255,0.05);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow-y: auto; /* Allow internal scrolling if needed */
+        }
+
+        /* TRANSITION OVERLAY */
+        #transition-shield {
+            position: absolute; inset: 0; background: rgba(0,0,0,0.5);
+            z-index: 50; opacity: 0; pointer-events: none; transition: opacity 0.5s;
+            display: flex; align-items: center; justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+        #transition-shield.active { opacity: 1; pointer-events: auto; }
+        .decompression-text {
+            font-family: 'JetBrains Mono'; font-size: 0.8rem; letter-spacing: 0.2em;
+            color: #fff; animation: pulse 1s infinite;
+        }
+
+        /* VIEW LAYERS */
+        .view-layer { flex-grow: 1; display: flex; flex-direction: column; gap: 1rem; transition: opacity 0.4s; min-height: 0; }
+        .hidden-layer { display: none; opacity: 0; }
+
+        /* HEADER */
+        .header { display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem; z-index: 20; flex-shrink: 0; }
+        .info-btn {
+            width: 36px; height: 36px; border-radius: 50%; border: 1px solid #333;
+            display: flex; align-items: center; justify-content: center;
+            color: #666; cursor: pointer; transition: all 0.2s; background: #050505;
+        }
+        .info-btn:hover { color: #fff; border-color: #fff; }
+
+        /* VISUALIZER */
+        .visor {
+            height: 120px; background: #050505; border: 1px solid #222; border-radius: 20px;
+            position: relative; overflow: hidden; flex-shrink: 0;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+        }
+        canvas { width: 100%; height: 100%; opacity: 0.8; mix-blend-mode: screen; transition: opacity 0.5s; }
+
+        /* MODES */
+        .controls { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; flex-shrink: 0; }
+        .mode-btn {
+            padding: 1rem 0.2rem; background: #080808; border: 1px solid #222; border-radius: 14px;
+            color: #666; font-family: 'JetBrains Mono'; font-size: 0.6rem; font-weight: 700;
+            cursor: pointer; transition: all 1.0s ease; text-align: center;
+        }
+        
+        .mode-btn.active-bio { border-color: var(--accent-bio); color: var(--accent-bio); background: rgba(16,185,129,0.05); box-shadow: 0 0 15px rgba(16,185,129,0.1); }
+        .mode-btn.active-psi { border-color: var(--accent-psi); color: var(--accent-psi); background: rgba(168,85,247,0.05); box-shadow: 0 0 15px rgba(168,85,247,0.1); }
+        .mode-btn.active-deep { border-color: var(--accent-deep); color: var(--accent-deep); background: rgba(59,130,246,0.05); box-shadow: 0 0 15px rgba(59,130,246,0.1); }
+
+        /* METRICS */
+        .metric-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; flex-shrink: 0; }
+        .metric { background: #080808; border: 1px solid #1a1a1a; border-radius: 14px; padding: 0.8rem; text-align: center; }
+        .m-lbl { font-size: 0.5rem; color: #555; display: block; margin-bottom: 4px; letter-spacing: 0.05em; }
+        .m-val { font-family: 'JetBrains Mono'; font-size: 0.9rem; font-weight: 700; color: #eee; }
+
+        /* START BUTTON */
+        .start-btn {
+            width: 100%; padding: 1.2rem; background: #0a0a0a; border: 1px solid #333; border-radius: 18px;
+            color: #fff; font-family: 'JetBrains Mono'; font-weight: 700; font-size: 0.85rem; letter-spacing: 0.2em;
+            cursor: pointer; transition: all 0.4s; margin-top: auto; flex-shrink: 0;
+        }
+        .start-btn.running { border-color: var(--accent-bio); color: #000; background: var(--accent-bio); box-shadow: 0 0 30px rgba(16,185,129,0.4); }
+
+        /* ARCHIVE */
+        .archive { background: #000; border: 1px solid #222; border-radius: 12px; height: 0px; overflow: hidden; transition: height 0.3s; opacity: 0; flex-shrink: 0; }
+        
+        /* CODEX */
+        .codex-container { flex-grow: 1; overflow-y: auto; padding-right: 5px; display: flex; flex-direction: column; gap: 1rem; }
+        .codex-card { background: #080808; border: 1px solid #222; border-radius: 18px; padding: 1.5rem; }
+        .codex-title { font-family: 'JetBrains Mono'; font-size: 0.8rem; font-weight: 700; margin-bottom: 0.75rem; }
+        .codex-text { font-size: 0.8rem; color: #888; line-height: 1.6; }
+        
+        /* Overlay Elements for Script Reference */
+        #overlay-val { display: none; }
+        #txt-temp { display: none; }
+        #bar-fill { display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="chassis">
+        
+        <div id="transition-shield">
+            <div class="decompression-text">NEURAL DECOMPRESSION...</div>
+        </div>
+
+        <div class="header">
+            <div>
+                <h1 class="text-xl font-bold text-white tracking-tight">THERMAL-CORE <span class="text-xs text-gray-500">v10.2</span></h1>
+                <div class="text-[10px] text-gray-500 font-mono mt-1 uppercase tracking-widest">Symphonic / Mobile</div>
+            </div>
+            <div id="btn-info" class="info-btn" onclick="toggleView()">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+            </div>
+        </div>
+
+        <div id="view-main" class="view-layer">
+            <div class="visor">
+                <canvas id="scope"></canvas>
+            </div>
+
+            <div class="controls">
+                <button id="m-bio" class="mode-btn active-bio" onclick="setMode('BIO')">H-REGEN<br><span class="text-[9px] opacity-50">111Hz</span></button>
+                <button id="m-psi" class="mode-btn" onclick="setMode('PSI')">PSI<br><span class="text-[9px] opacity-50">40Hz</span></button>
+                <button id="m-deep" class="mode-btn" onclick="setMode('DEEP')">DELTA<br><span class="text-[9px] opacity-50">0.5Hz</span></button>
+            </div>
+
+            <div class="metric-grid">
+                <div class="metric">
+                    <span class="m-lbl">HARMONICS</span>
+                    <span id="val-h" class="m-val text-emerald-400">0.00</span>
+                </div>
+                <div class="metric">
+                    <span class="m-lbl">FLUX RESIST</span>
+                    <span id="val-flux" class="m-val text-red-400">0%</span>
+                </div>
+                <div class="metric">
+                    <span class="m-lbl">BENEFIT</span>
+                    <span id="val-ben" class="m-val text-blue-400">0.00</span>
+                </div>
+            </div>
+
+            <div class="flex-grow"></div>
+            
+            <textarea id="archive" class="archive text-[10px] font-mono text-gray-500" readonly>READY.</textarea>
+            <button id="btn-act" class="start-btn" onclick="toggleSystem()">INITIATE SEQUENCE</button>
+            <div style="height:5px; flex-shrink:0;"></div>
+        </div>
+
+        <div id="view-info" class="view-layer hidden-layer">
+            <div class="codex-container">
+                <div class="codex-card">
+                    <div class="codex-title" style="color:var(--accent-bio)">H-REGENERATION</div>
+                    <p class="codex-text">Symphonic 111Hz stack for cellular resonance. Use for physical recovery.</p>
+                </div>
+                <div class="codex-card">
+                    <div class="codex-title" style="color:var(--accent-psi)">CLAIRVOYANCE</div>
+                    <p class="codex-text">40Hz Gamma pulse. Use for high-level cognitive binding and insight.</p>
+                </div>
+                <div class="codex-card">
+                    <div class="codex-title" style="color:var(--accent-deep)">DEEP SLEEP</div>
+                    <p class="codex-text">0.5Hz Delta sub-bass. Forces deep restoration. <br><br><strong>NOTE:</strong> Transitioning to this mode triggers "Neural Decompression" to prevent entrainment shock.</p>
+                </div>
+                <button class="start-btn" style="background:#111; border-color:#333" onclick="toggleView()">RETURN TO CORE</button>
+            </div>
+        </div>
+        
+        <span id="overlay-val"></span>
+        <span id="txt-temp"></span>
+        <div id="bar-fill"></div>
+    </div>
+
+    <script>
+        // --- v10.2 CONSTANTS ---
+        const P = { TICK: 0.016, TARGET_HRV: 85 };
+        const MODES = {
+            BIO: { FREQ: 111, PULSE: 0.1, COLOR: '#10b981', TARGET: 2.0, WAVE: 'sine' },
+            PSI: { FREQ: 160, PULSE: 40, COLOR: '#a855f7', TARGET: 3.0, WAVE: 'square' },
+            DEEP: { FREQ: 60, PULSE: 0.5, COLOR: '#3b82f6', TARGET: 1.5, WAVE: 'sine' }
+        };
+
+        let s = {
+            active: false, mode: 'BIO', hardware: false, transitioning: false,
+            hrv: 60, temp: 0.0, target: 2.0, benefit: 0.0, harmonics: 0.0,
+            walker: 0, start: 0, history: new Array(120).fill(60)
+        };
+
+        let audio = { ctx: null, master: null, noise: null, noiseGain: null, drones: [], lfo: null, lfoGain: null };
+
+        // --- PHYSICS ---
+        function tick() {
+            if (!s.active) return;
+
+            if (!s.hardware) {
+                const drift = (Math.random()-0.5)*1.5;
+                s.walker += drift;
+                s.hrv += s.walker + ((P.TARGET_HRV - s.hrv)*0.03);
+                s.walker *= 0.95;
+            }
+
+            const err = s.target - s.temp;
+            const seal = Math.min(1, s.hrv/100);
+            const flux = (Math.random()-0.5)*0.08*(1-seal);
+            s.temp += (err*0.15 + flux) * P.TICK;
+
+            const stab = 1 - Math.min(1, Math.abs(err));
+            s.benefit += stab * (s.mode === 'BIO' ? 0.005 : 0.01);
+
+            s.history.push(s.hrv);
+            if(s.history.length > 150) s.history.shift();
+
+            render(); updateUI();
+            requestAnimationFrame(tick);
+        }
+
+        // --- SYMPHONIC AUDIO ---
+        function initAudio() {
+            if(audio.ctx) return;
+            const AC = window.AudioContext || window.webkitAudioContext;
+            audio.ctx = new AC();
+            
+            const comp = audio.ctx.createDynamicsCompressor();
+            comp.threshold.value = -10; comp.ratio.value = 12;
+            comp.connect(audio.ctx.destination);
+            
+            audio.master = audio.ctx.createGain();
+            audio.master.gain.value = 0;
+            audio.master.connect(comp);
+
+            // Pink Noise (The Womb)
+            const bSize = 2 * audio.ctx.sampleRate;
+            const nBuf = audio.ctx.createBuffer(1, bSize, audio.ctx.sampleRate);
+            const d = nBuf.getChannelData(0);
+            let b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=0;
+            for(let i=0;i<bSize;i++) {
+                let w = Math.random()*2-1;
+                b0 = 0.99886*b0+w*0.0555179; b1=0.99332*b1+w*0.0750759; b2=0.969*b2+w*0.153852;
+                b3=0.8665*b3+w*0.3104856; b4=0.55*b4+w*0.5329522; b5=-0.7616*b5-w*0.016898;
+                d[i] = (b0+b1+b2+b3+b4+b5+b6+w*0.5362)*0.11; b6=w*0.115926;
+            }
+            audio.noise = audio.ctx.createBufferSource();
+            audio.noise.buffer = nBuf; audio.noise.loop = true;
+            audio.noiseGain = audio.ctx.createGain();
+            audio.noiseGain.gain.value = 0.05;
+            audio.noise.connect(audio.noiseGain).connect(audio.master);
+            audio.noise.start();
+
+            // Tri-Phonic Drone Stack
+            const createOsc = (t, dt, p) => {
+                const o = audio.ctx.createOscillator(); o.type = t; o.detune.value = dt;
+                const pan = audio.ctx.createStereoPanner(); pan.pan.value = p;
+                const g = audio.ctx.createGain(); g.gain.value = 0.3;
+                o.connect(g).connect(pan).connect(audio.master); o.start();
+                return {o, g};
+            };
+            audio.drones = [
+                createOsc('sine', 0, 0),
+                createOsc('triangle', -5, -0.3),
+                createOsc('sine', 5, 0.3)
+            ];
+
+            // LFO Pulse
+            audio.lfo = audio.ctx.createOscillator();
+            audio.lfoGain = audio.ctx.createGain();
+            audio.lfoGain.gain.value = 0; 
+            audio.lfo.connect(audio.lfoGain);
+            audio.drones.forEach(d => audio.lfoGain.connect(d.g.gain));
+            audio.lfo.start();
+        }
+
+        function updateAudioMode(modeKey) {
+            if(!audio.ctx) return;
+            const m = MODES[modeKey];
+            const now = audio.ctx.currentTime;
+            const prevMode = s.mode; 
+
+            // CALCULATE TRANSITION TIME (The Glissando)
+            // Deep shifts need 4-5 seconds. Small shifts need 2 seconds.
+            let rampTime = 2.0;
+            if (modeKey === 'DEEP' || prevMode === 'DEEP') rampTime = 5.0; 
+
+            // Engage Shield if shift is major
+            if (rampTime > 3.0) {
+                s.transitioning = true;
+                document.getElementById('transition-shield').classList.add('active');
+                setTimeout(() => {
+                    s.transitioning = false;
+                    document.getElementById('transition-shield').classList.remove('active');
+                }, rampTime * 1000);
+            }
+
+            // Frequency Glissando
+            audio.drones.forEach(d => {
+                d.o.frequency.linearRampToValueAtTime(m.FREQ, now + rampTime);
+            });
+
+            // LFO Rate Glissando
+            audio.lfo.frequency.linearRampToValueAtTime(m.PULSE, now + rampTime);
+            
+            // Pulse Depth Adjustment
+            const depth = modeKey === 'PSI' ? 0.5 : 0.15;
+            audio.lfoGain.gain.linearRampToValueAtTime(depth, now + rampTime);
+        }
+
+        // --- VISUALS ---
+        function render() {
+            const cvs = document.getElementById('scope');
+            const ctx = cvs.getContext('2d');
+            const dpr = window.devicePixelRatio || 1;
+            if (cvs.width !== cvs.clientWidth * dpr) { cvs.width = cvs.clientWidth*dpr; cvs.height = cvs.clientHeight*dpr; ctx.scale(dpr,dpr); }
+            
+            const w = cvs.clientWidth, h = cvs.clientHeight;
+            ctx.clearRect(0,0,w,h);
+            
+            ctx.beginPath();
+            ctx.strokeStyle = MODES[s.mode].COLOR;
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+            ctx.shadowBlur = 20; ctx.shadowColor = MODES[s.mode].COLOR;
+            
+            const step = w/s.history.length;
+            for(let i=0; i<s.history.length; i++) {
+                const y = h - ((s.history[i]-30)/100)*h;
+                i===0 ? ctx.moveTo(0,y) : ctx.lineTo(i*step, y);
+            }
+            ctx.stroke(); ctx.shadowBlur = 0;
+        }
+
+        // --- UI ---
+        function updateUI() {
+            const m = MODES[s.mode];
+            
+            // Update visible elements
+            if(document.getElementById('val-h')) document.getElementById('val-h').innerText = (s.harmonics || 0).toFixed(2);
+            if(document.getElementById('val-ben')) document.getElementById('val-ben').innerText = s.benefit.toFixed(3);
+            if(document.getElementById('val-flux')) document.getElementById('val-flux').innerText = Math.floor((1-(s.hrv/120))*100) + "%";
+
+            // Update hidden elements if they exist (prevents console errors)
+            const ovVal = document.getElementById('overlay-val');
+            if(ovVal) {
+                ovVal.innerText = Math.floor(s.hrv);
+                ovVal.style.color = m.COLOR;
+            }
+            
+            const txtTemp = document.getElementById('txt-temp');
+            if(txtTemp) txtTemp.innerText = s.temp.toFixed(3);
+            
+            const barFill = document.getElementById('bar-fill');
+            if(barFill) {
+                barFill.style.width = ((s.temp/3.5)*100)+'%';
+                barFill.style.backgroundColor = m.COLOR;
+            }
+        }
+
+        // --- SYSTEM CONTROL (FIXED FOR IOS) ---
+        function toggleSystem() {
+            // 1. Initialize the audio engine if it doesn't exist
+            initAudio(); 
+
+            // 2. THE FIX: Force the audio engine to wake up (Essential for iOS)
+            if (audio.ctx && audio.ctx.state === 'suspended') {
+                audio.ctx.resume();
+            }
+
+            s.active = !s.active;
+            const btn = document.getElementById('btn-act');
+            
+            if(s.active) {
+                s.start = Date.now(); 
+                s.benefit = 0; 
+                s.harmonics = 0; 
+                s.hrv = 60;
+                
+                btn.innerText = "TERMINATE SEQUENCE"; 
+                btn.classList.add('running');
+                
+                updateAudioMode(s.mode);
+                
+                // Smooth fade in
+                if(audio.master) {
+                    audio.master.gain.cancelScheduledValues(audio.ctx.currentTime);
+                    audio.master.gain.setValueAtTime(0, audio.ctx.currentTime);
+                    audio.master.gain.linearRampToValueAtTime(0.2, audio.ctx.currentTime + 1.0);
+                }
+                
+                requestAnimationFrame(tick);
+            } else {
+                btn.innerText = "INITIATE SEQUENCE"; 
+                btn.classList.remove('running');
+                
+                // Smooth fade out
+                if(audio.master) {
+                    audio.master.gain.cancelScheduledValues(audio.ctx.currentTime);
+                    audio.master.gain.setValueAtTime(audio.master.gain.value, audio.ctx.currentTime);
+                    audio.master.gain.linearRampToValueAtTime(0, audio.ctx.currentTime + 0.5);
+                }
+            }
+        }
+
+        function setMode(m) {
+            if (s.transitioning) return; // Safety Lock
+            
+            s.mode = m; s.target = MODES[m].TARGET;
+            ['bio','psi','deep'].forEach(k => {
+                const b = document.getElementById(`m-${k}`);
+                b.className = `mode-btn ${k.toUpperCase()===m ? 'active-'+k : ''}`;
+            });
+            if(s.active) updateAudioMode(m);
+        }
+
+        function toggleView() {
+            const main = document.getElementById('view-main');
+            const info = document.getElementById('view-info');
+            const btn = document.getElementById('btn-info');
+            if (main.classList.contains('hidden-layer')) {
+                main.classList.remove('hidden-layer'); info.classList.add('hidden-layer'); btn.classList.remove('active');
+            } else {
+                main.classList.add('hidden-layer'); info.classList.remove('hidden-layer'); btn.classList.add('active');
+            }
+        }
+        
+        async function connectBluetooth() {
+            try {
+                const device = await navigator.bluetooth.requestDevice({ filters: [{ services: ['heart_rate'] }] });
+                const server = await device.gatt.connect();
+                const service = await server.getPrimaryService('heart_rate');
+                const char = await service.getCharacteristic('heart_rate_measurement');
+                await char.startNotifications();
+                char.addEventListener('characteristicvaluechanged', (e) => {
+                    const val = e.target.value;
+                    s.hrv = (val.getUint8(0) & 0x1) ? val.getUint16(1, true) : val.getUint8(1);
+                });
+                s.hardware = true; alert("SENSOR LINKED");
+            } catch(e) { alert("LINK FAILED."); }
+        }
+    </script>
+</body>
+</html>
